@@ -1,0 +1,143 @@
+
+// Esp 32 Master Serial Code
+// Sending 16 bit data in the form of 8 bit data
+#include "Arduino.h"
+#include "HardwareSerial.h"
+#include "LiquidCrystal_I2C.h"
+#define LED GPIO_NUM_23
+#define RX2 GPIO_NUM_16 
+#define TX2 GPIO_NUM_17
+#define UP  GPIO_NUM_36
+#define DOWN GPIO_NUM_39
+#define SELECT GPIO_NUM_34
+#define BACK GPIO_NUM_35
+
+
+unsigned int button_state_up, button_state_down, button_state_select, button_state_back;
+
+  int lcdColumns = 16;
+  int lcdRows = 2;
+
+  unsigned int counter;
+
+  LiquidCrystal_I2C lcd(0x27, lcdColumns, lcdRows);
+void setup() {
+
+  lcd.init();
+  lcd.backlight();
+  Serial2.begin(9600, SERIAL_8N1, RX2, TX2);
+  pinMode(LED, OUTPUT);
+  pinMode(UP, INPUT);
+  pinMode(DOWN, INPUT);
+  pinMode(SELECT, INPUT);
+  pinMode(BACK, INPUT);
+  button_state_up = 0; button_state_down = 0; button_state_select = 0; button_state_back = 0;
+
+  counter = 5;
+}
+
+void loop() {  
+button_state_up = digitalRead(UP); button_state_down = digitalRead(DOWN); button_state_select = digitalRead(SELECT); button_state_back = digitalRead(BACK);
+
+
+
+if (button_state_up == HIGH)
+{   
+    delay(20);
+    Serial2.write(5);
+    digitalWrite(LED, HIGH);    
+    
+}else if (button_state_down == HIGH)
+{   
+    delay(20);
+    Serial2.write(10);
+    digitalWrite(LED, HIGH);    
+    
+}else if (button_state_select == HIGH)
+{   
+    Serial2.write(15);
+    digitalWrite(LED, HIGH);    
+    
+}else if (button_state_back == HIGH)
+{   
+    delay(20);
+    Serial2.write(20);
+    digitalWrite(LED, HIGH);    
+    
+}else Serial2.write(0); digitalWrite(LED, LOW);
+
+}
+
+
+    
+    
+
+
+//PIC RECEIVER CODE
+
+// PIC Slave Serial Code
+// Receiving 16 bit data from ESP32 and performing logics on 16 bit data
+#include <xc.h>
+#include "stdint.h"
+
+
+void uart_init(void)
+{
+    BAUDCON2 = 0x08;
+    RCSTA2 = 0x90;
+    TXSTA2 = 0x24;
+    SPBRG2 = 0xCF;
+    SPBRGH2 = 0x00;
+}
+ 
+// read function
+uint8_t uart_read(void)
+{
+   while(!PIR3bits.RC2IF)
+    {
+    }
+    
+    if(1 == RCSTA2bits.OERR)
+    {
+        // EUSART2 error - restart
+
+        RCSTA2bits.CREN = 0; 
+        RCSTA2bits.CREN = 1; 
+    }
+
+    return RCREG2;
+}
+
+void uart_write(uint8_t txData)
+{
+    while(0 == PIR3bits.TX2IF)
+    {
+
+    }
+    TXREG2 = txData;    // Write the data byte to the USART.
+}
+
+void main(void) {
+    OSCCON                  = 0b01110000;				// 8MHz INTOSC
+     TRISB = 0xC0;
+    uart_init();
+    uint16_t rx; 
+    
+    
+    RPINR16 = 0x0A;   //RB7->EUSART2:RX2;
+    RPOR14 = 0x06;   //RC3->EUSART2:TX2;
+
+    while(1)
+    {
+    
+        
+        rx = uart_read();
+        
+
+        if(rx == 5 || rx == 10 || rx == 15 || rx == 20)PORTBbits.RB5 = 1;
+        else PORTBbits.RB5 = 0;
+        
+        
+    }
+   
+}
